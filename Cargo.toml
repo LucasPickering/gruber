@@ -12,8 +12,19 @@ license = "MIT"
 rust-version = "1.86.0"
 
 [dependencies]
+anyhow = "1.0.98"
+chrono = {version = "0.4.41", default-features = false, features = [
+    "clock",
+    "serde",
+]}
 iced = {version = "0.13.1", default-features = true}
 iced_aw = {version = "0.12.2", default-features = false, features = ["tab_bar"]}
+indexmap = "2.9.0"
+itertools = "0.14.0"
+log = "0.4.27"
+serde = {version = "1.0.219", default-features = false, features = ["derive"]}
+serde_json = {version = "1.0.140"}
+ureq = {version = "2.9.6", features = ["json"]}
 
 [workspace.lints.rust]
 async_fn_in_trait = "allow"

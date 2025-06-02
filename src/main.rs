@@ -1,14 +1,21 @@
-use std::fmt::Display;
+mod config;
+mod services;
 
+use crate::config::Config;
 use iced::{Element, Length, widget::Column};
 use iced_aw::{TabBar, TabLabel, iced_fonts};
+use std::fmt::Display;
 
-fn main() -> iced::Result {
+fn main() -> anyhow::Result<()> {
+    let config = Config::load()?;
+
     iced::application("Gruber", State::update, State::view)
         .font(iced_fonts::REQUIRED_FONT_BYTES)
         .resizable(false)
-        .window_size((400.0, 400.0))
-        .run()
+        .window_size(config.window_size)
+        .run()?;
+
+    Ok(())
 }
 
 /// State transitions
