@@ -1,9 +1,8 @@
-mod transit;
-mod weather;
-
-pub use transit::TransitLine;
+pub mod transit;
+pub mod weather;
 
 use anyhow::{Context, anyhow};
+use iced::Task;
 use log::{error, info, warn};
 use serde::de::DeserializeOwned;
 use std::{
@@ -11,6 +10,18 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
+
+use crate::Message;
+
+/// Create an iced task that resolves a fallible future. If the future
+/// succeeded, produce a message using the given function.
+pub fn fallible_task<T: 'static + Send>(
+    future: impl 'static + Future<Output = anyhow::Result<T>> + Send,
+    f: impl 'static + (Fn(T) -> Message) + Send + Sync,
+) -> Task<Message> {
+    // TODO log errors
+    Task::future(future).and_then(move |data| Task::done(f(data)))
+}
 
 /// Helper for regularly fetching data from an API
 #[derive(Debug)]

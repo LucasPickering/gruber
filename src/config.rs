@@ -1,4 +1,4 @@
-use crate::services::TransitLine;
+use crate::services::transit::TransitLine;
 use anyhow::Context;
 use log::info;
 use serde::Deserialize;

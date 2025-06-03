@@ -1,7 +1,34 @@
 use crate::{config::Config, services::ApiFetcher};
+use anyhow::Context;
 use chrono::{DateTime, Local, NaiveTime, Utc};
+use log::info;
 use serde::Deserialize;
 use std::time::Duration;
+
+/// Fetch weather forecast data
+///
+/// impl Trait return is needed to detach the future's lifetime from the input
+pub fn fetch_weather(
+    config: &Config,
+) -> impl 'static + Future<Output = anyhow::Result<Forecast>> {
+    let url = format!(
+        "{}/gridpoints/{}/{},{}/forecast/hourly",
+        Weather::API_HOST,
+        config.forecast_office,
+        config.forecast_gridpoint.0,
+        config.forecast_gridpoint.1
+    );
+    async {
+        info!("Fetching weather data from {}", url);
+        let response =
+            reqwest::get(url).await.context("Error fetching weather")?;
+        response
+            .error_for_status()?
+            .json()
+            .await
+            .context("Error parsing weather")
+    }
+}
 
 /// Gotta know weather or not it's gonna rain
 #[derive(Debug)]

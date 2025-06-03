@@ -1,3 +1,5 @@
+#![expect(unused)] // TODO remove
+
 use crate::{config::Config, services::ApiFetcher};
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
