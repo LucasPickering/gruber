@@ -1,0 +1,12 @@
+{
+  "name": "gruber",
+  "version": "0.1.0",
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.5.0",
+    "elm": "^0.19.1-6",
+    "elm-format": "^0.8.7",
+    "elm-live": "^4.0.2"
+  },
+  "private": true,
+  "type": "module"
+}
