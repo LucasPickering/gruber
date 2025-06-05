@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "Gruber",
-        "width": 720,
-        "height": 720,
+        "width": 400,
+        "height": 400,
         "resizable": false,
         "fullscreen": false
       }

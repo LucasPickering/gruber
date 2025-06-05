@@ -1,6 +1,5 @@
 <script lang="ts">
   import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
   import { derived } from 'svelte/store';
 
   // Determine which tab is active based on the current path
@@ -38,7 +37,7 @@
 <svelte:head>
   <script>
     if (window.location.pathname === '/') {
-      window.location.replace('/weather');
+      window.location.pathname = '/weather';
     }
   </script>
 </svelte:head>
