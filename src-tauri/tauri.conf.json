@@ -4,10 +4,10 @@
   "version": "0.1.0",
   "identifier": "com.tauri.dev",
   "build": {
-    "frontendDist": "../dist",
-    "devUrl": "http://localhost:8000",
-    "beforeDevCommand": "elm-live src/Main.elm",
-    "beforeBuildCommand": "elm make"
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../build"
   },
   "app": {
     "windows": [
