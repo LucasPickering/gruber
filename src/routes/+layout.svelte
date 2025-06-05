@@ -9,29 +9,25 @@
     // Default to weather for root or /weather
     return 'weather';
   });
-
-  function navigate(path: string) {
-    goto(path);
-  }
 </script>
 
 <nav class="tab-bar">
-  <button
+  <a
+    href="/weather"
     class="tab"
     class:active={$activeTab === 'weather'}
     aria-current={$activeTab === 'weather' ? 'page' : undefined}
-    on:click={() => navigate('/weather')}
   >
     Weather
-  </button>
-  <button
+  </a>
+  <a
+    href="/transit"
     class="tab"
     class:active={$activeTab === 'transit'}
     aria-current={$activeTab === 'transit' ? 'page' : undefined}
-    on:click={() => navigate('/transit')}
   >
     Transit
-  </button>
+  </a>
 </nav>
 
 <main>
@@ -51,27 +47,31 @@
   .tab-bar {
     display: flex;
     border-bottom: 2px solid #eee;
-    background: #fafafa;
-    padding: 0 1rem;
+    background: #666;
+    border: none;
     margin-bottom: 2rem;
   }
+
   .tab {
+    flex: 1;
     padding: 1rem 2rem;
-    cursor: pointer;
     border: none;
-    background: none;
-    font-size: 1.1rem;
+    background-color: none;
+    font-size: 1.5rem;
     font-weight: 500;
-    color: #555;
-    border-bottom: 2px solid transparent;
+    text-align: center;
+    text-decoration: none;
     transition:
       border-color 0.2s,
       color 0.2s;
   }
+
   .tab.active {
-    color: #0070f3;
-    border-bottom: 2px solid #0070f3;
+    background-color: #555;
+    color: #09bccb;
+    border-bottom: 4px solid #09bccb;
   }
+
   main {
     max-width: 700px;
     margin: 0 auto;
