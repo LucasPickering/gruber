@@ -1,17 +1,24 @@
 pub mod transit;
 pub mod weather;
 
+use crate::Message;
 use anyhow::{Context, anyhow};
 use iced::Task;
 use log::{error, info, warn};
 use serde::de::DeserializeOwned;
 use std::{
-    sync::{Arc, RwLock},
+    sync::{Arc, LazyLock, RwLock},
     thread,
     time::{Duration, Instant},
 };
 
-use crate::Message;
+/// Reqwest HTTP client
+static CLIENT: LazyLock<reqwest::Client> = LazyLock::new(|| {
+    reqwest::Client::builder()
+        .user_agent("gruber")
+        .build()
+        .unwrap()
+});
 
 /// Create an iced task that resolves a fallible future. If the future
 /// succeeded, produce a message using the given function.

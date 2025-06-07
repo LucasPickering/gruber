@@ -1,9 +1,18 @@
-use crate::{config::Config, services::ApiFetcher};
+use crate::{config::Config, services::CLIENT};
 use anyhow::Context;
 use chrono::{DateTime, Local, NaiveTime, Utc};
 use log::info;
 use serde::Deserialize;
 use std::time::Duration;
+
+const FORECAST_TTL: Duration = Duration::from_secs(60);
+const API_HOST: &str = "https://api.weather.gov";
+// Start and end (inclusive) of forecast times that *should* be shown.
+// unstable: const unwrap https://github.com/rust-lang/rust/issues/67441
+const DAY_START: NaiveTime = NaiveTime::from_hms_opt(4, 30, 0).unwrap();
+const DAY_END: NaiveTime = NaiveTime::from_hms_opt(22, 30, 0).unwrap();
+/// We show every n periods in the future
+const PERIOD_INTERNAL: usize = 4;
 
 /// Fetch weather forecast data
 ///
@@ -13,56 +22,23 @@ pub fn fetch_weather(
 ) -> impl 'static + Future<Output = anyhow::Result<Forecast>> {
     let url = format!(
         "{}/gridpoints/{}/{},{}/forecast/hourly",
-        Weather::API_HOST,
+        API_HOST,
         config.forecast_office,
         config.forecast_gridpoint.0,
         config.forecast_gridpoint.1
     );
     async {
         info!("Fetching weather data from {}", url);
-        let response =
-            reqwest::get(url).await.context("Error fetching weather")?;
+        let response = CLIENT
+            .get(url)
+            .send()
+            .await
+            .context("Error fetching weather")?;
         response
             .error_for_status()?
             .json()
             .await
             .context("Error parsing weather")
-    }
-}
-
-/// Gotta know weather or not it's gonna rain
-#[derive(Debug)]
-pub struct Weather {
-    fetcher: ApiFetcher<Forecast>,
-}
-
-impl Weather {
-    const FORECAST_TTL: Duration = Duration::from_secs(60);
-    const API_HOST: &'static str = "https://api.weather.gov";
-    // Start and end (inclusive) of forecast times that *should* be shown.
-    // unstable: const unwrap https://github.com/rust-lang/rust/issues/67441
-    const DAY_START: NaiveTime = NaiveTime::from_hms_opt(4, 30, 0).unwrap();
-    const DAY_END: NaiveTime = NaiveTime::from_hms_opt(22, 30, 0).unwrap();
-    /// We show every n periods in the future
-    const PERIOD_INTERNAL: usize = 4;
-
-    pub fn new(config: &Config) -> Self {
-        let url = format!(
-            "{}/gridpoints/{}/{},{}/forecast/hourly",
-            Self::API_HOST,
-            config.forecast_office,
-            config.forecast_gridpoint.0,
-            config.forecast_gridpoint.1
-        );
-        Self {
-            fetcher: ApiFetcher::new(url, Self::FORECAST_TTL),
-        }
-    }
-
-    /// Get the latest forecast. If the forecast is missing or outdated, spawn
-    /// a task to re-fetch it
-    pub fn forecast(&self) -> Option<Forecast> {
-        self.fetcher.data()
     }
 }
 
@@ -103,12 +79,12 @@ impl Forecast {
     /// Get the list of periods that should be shown in the list. This skips
     /// periods in the middle of the night.
     pub fn future_periods(&self) -> impl '_ + Iterator<Item = &ForecastPeriod> {
-        let day_range = Weather::DAY_START..=Weather::DAY_END;
+        let day_range = DAY_START..=DAY_END;
         self.properties
             .periods
             .iter()
             .skip(1)
-            .step_by(Weather::PERIOD_INTERNAL)
+            .step_by(PERIOD_INTERNAL)
             .filter(move |period| {
                 day_range.contains(&period.start_time().time())
             })

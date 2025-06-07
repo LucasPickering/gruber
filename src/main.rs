@@ -1,21 +1,19 @@
 mod config;
 mod services;
+mod view;
 
 use crate::{
     config::Config,
     services::weather::{self, Forecast},
 };
-use iced::{
-    Element, Length, Task,
-    widget::{Column, text},
-};
-use iced_aw::{TabBar, TabLabel, iced_fonts};
+use iced::Task;
+use iced_aw::iced_fonts;
 use std::fmt::Display;
 
 fn main() -> anyhow::Result<()> {
     let config = Config::load()?;
 
-    iced::application("Gruber", State::update, State::view)
+    iced::application("Gruber", State::update, view::view)
         // .subscription(State::subscription)
         .font(iced_fonts::REQUIRED_FONT_BYTES)
         .resizable(false)
@@ -68,35 +66,6 @@ impl State {
         }
         Task::none()
     }
-
-    fn view(&self) -> Element<Message> {
-        // Build the tab bar
-        let tabs = Tab::iter()
-            .fold(TabBar::new(Message::TabSelected), |tab_bar, tab| {
-                tab_bar.push(tab, TabLabel::Text(tab.to_string()))
-            })
-            .set_active_tab(&self.active_tab)
-            // Fill the entire screen evenly
-            .tab_width(Length::FillPortion(Tab::iter().count() as u16))
-            .padding(5.0)
-            .text_size(32.0);
-        let content = match self.active_tab {
-            Tab::Weather => {
-                if let Some(forecast) = &self.forecast {
-                    view_weather(forecast)
-                } else {
-                    text("Loading...").into()
-                }
-            }
-            Tab::Transit => text("TODO").into(),
-        };
-        Column::new().push(tabs).push(content).into()
-    }
-}
-
-fn view_weather(forecast: &weather::Forecast) -> Element<'_, Message> {
-    let now = forecast.now();
-    text(format!("{} / {}", now.temperature(), now.prob_of_precip())).into()
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
