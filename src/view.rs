@@ -1,11 +1,8 @@
-use crate::{
-    Message, State, Tab,
-    services::weather::{Forecast, ForecastPeriod},
-};
+use crate::{Message, State, Tab, services::weather::Forecast};
 use iced::{
     Element, Length, Padding,
     alignment::Horizontal,
-    widget::{Column, Container, Text, text},
+    widget::{Column, Container, text},
 };
 use iced_aw::{Grid, TabBar, TabLabel, grid_row};
 
@@ -26,7 +23,7 @@ pub fn view(state: &State) -> Element<Message> {
         .text_size(FONT_SIZE_MEDIUM);
     let content = match state.active_tab {
         Tab::Weather => {
-            if let Some(forecast) = &state.forecast {
+            if let Some(forecast) = state.weather.forecast() {
                 view_weather(forecast)
             } else {
                 text("Loading...").into()

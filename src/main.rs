@@ -4,11 +4,14 @@ mod view;
 
 use crate::{
     config::Config,
-    services::weather::{self, Forecast},
+    services::{
+        ExternalData, FetchedData,
+        weather::{Forecast, Weather},
+    },
 };
-use iced::{Task, Theme, window};
+use iced::{Subscription, Task, Theme, window};
 use iced_aw::iced_fonts;
-use std::fmt::Display;
+use std::{fmt::Display, time::Duration};
 
 fn main() -> anyhow::Result<()> {
     let config = Config::load()?;
@@ -22,7 +25,7 @@ fn main() -> anyhow::Result<()> {
         ..window::Settings::default()
     };
     iced::application("Gruber", State::update, view::view)
-        // .subscription(State::subscription)
+        .subscription(State::check_data_subscription)
         .settings(iced::Settings {
             default_text_size: 24.0.into(),
             ..iced::Settings::default()
@@ -31,19 +34,19 @@ fn main() -> anyhow::Result<()> {
         .resizable(false)
         .window(window_settings)
         .theme(|_| Theme::TokyoNightStorm)
-        .run_with(|| {
-            (State::new(config), Task::done(Message::WeatherFetchStart))
-        })?;
+        .run_with(|| (State::new(config), Task::done(Message::CheckData)))?;
 
     Ok(())
 }
 
 /// State transitions
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum Message {
+    /// Periodically check all data to see if it's stale. Anything that is will
+    /// be refetched
+    CheckData,
     TabSelected(Tab),
-    WeatherFetchStart,
-    WeatherFetchEnd(Forecast),
+    WeatherFetched(FetchedData<Forecast>),
 }
 
 /// Global app state
@@ -51,7 +54,7 @@ enum Message {
 struct State {
     config: Config,
     active_tab: Tab,
-    forecast: Option<Forecast>,
+    weather: Weather,
 }
 
 impl State {
@@ -59,25 +62,30 @@ impl State {
         Self {
             config,
             active_tab: Tab::Weather,
-            forecast: None,
+            weather: Weather::default(),
         }
     }
 
+    /// Update state according to an incoming message
     fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::TabSelected(index) => self.active_tab = index,
-            Message::WeatherFetchStart => {
-                // Spawn a task to fetch weather
-                return services::fallible_task(
-                    weather::fetch_weather(&self.config),
-                    Message::WeatherFetchEnd,
-                );
+            Message::CheckData => {
+                // Check all data sources in parallel
+                return Task::batch([self
+                    .weather
+                    .fetch_if_needed(&self.config)]);
             }
-            Message::WeatherFetchEnd(forecast) => {
-                self.forecast = Some(forecast)
+            Message::TabSelected(index) => self.active_tab = index,
+            Message::WeatherFetched(forecast) => {
+                self.weather.set_data(forecast)
             }
         }
         Task::none()
+    }
+
+    /// Create a subscription that will periodically send a `CheckData` message
+    fn check_data_subscription(&self) -> Subscription<Message> {
+        iced::time::every(Duration::from_secs(1)).map(|_| Message::CheckData)
     }
 }
 

@@ -1,11 +1,14 @@
-use crate::{config::Config, services::CLIENT};
+use crate::{
+    Message,
+    config::Config,
+    services::{CLIENT, ExternalData, FetchedData},
+};
 use anyhow::Context;
 use chrono::{DateTime, Local, NaiveTime, Utc};
 use log::info;
 use serde::Deserialize;
 use std::time::Duration;
 
-const FORECAST_TTL: Duration = Duration::from_secs(60);
 const API_HOST: &str = "https://api.weather.gov";
 // Start and end (inclusive) of forecast times that *should* be shown.
 const DAY_START: NaiveTime = NaiveTime::from_hms_opt(4, 30, 0).unwrap();
@@ -13,31 +16,56 @@ const DAY_END: NaiveTime = NaiveTime::from_hms_opt(22, 30, 0).unwrap();
 /// We show every n periods in the future
 const PERIOD_INTERNAL: usize = 4;
 
-/// Fetch weather forecast data
-///
-/// impl Trait return is needed to detach the future's lifetime from the input
-pub fn fetch_weather(
-    config: &Config,
-) -> impl 'static + Future<Output = anyhow::Result<Forecast>> {
-    let url = format!(
-        "{}/gridpoints/{}/{},{}/forecast/hourly",
-        API_HOST,
-        config.forecast_office,
-        config.forecast_gridpoint.0,
-        config.forecast_gridpoint.1
-    );
-    async {
-        info!("Fetching weather data from {}", url);
-        let response = CLIENT
-            .get(url)
-            .send()
-            .await
-            .context("Error fetching weather")?;
-        response
-            .error_for_status()?
-            .json()
-            .await
-            .context("Error parsing weather")
+/// Fetch weather data from the weather.gov API
+#[derive(Debug, Default)]
+pub struct Weather(Option<FetchedData<Forecast>>);
+
+impl Weather {
+    pub fn forecast(&self) -> Option<&Forecast> {
+        self.0.as_ref().map(|data| &data.data)
+    }
+}
+
+impl ExternalData for Weather {
+    const TTL: Duration = Duration::from_secs(60);
+    type Data = Forecast;
+
+    fn data(&self) -> Option<&FetchedData<Self::Data>> {
+        self.0.as_ref()
+    }
+
+    fn set_data(&mut self, data: FetchedData<Self::Data>) {
+        self.0 = Some(data);
+    }
+
+    fn data_to_message(data: FetchedData<Self::Data>) -> Message {
+        Message::WeatherFetched(data)
+    }
+
+    fn fetch(
+        config: &Config,
+    ) -> impl 'static + Future<Output = anyhow::Result<Self::Data>> + Send {
+        let url = format!(
+            "{}/gridpoints/{}/{},{}/forecast/hourly",
+            API_HOST,
+            config.forecast_office,
+            config.forecast_gridpoint.0,
+            config.forecast_gridpoint.1
+        );
+
+        async {
+            info!("Fetching weather data from {}", url);
+            let response = CLIENT
+                .get(url)
+                .send()
+                .await
+                .context("Error fetching weather")?;
+            response
+                .error_for_status()?
+                .json()
+                .await
+                .context("Error parsing weather")
+        }
     }
 }
 
