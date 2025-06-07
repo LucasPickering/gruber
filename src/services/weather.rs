@@ -8,7 +8,6 @@ use std::time::Duration;
 const FORECAST_TTL: Duration = Duration::from_secs(60);
 const API_HOST: &str = "https://api.weather.gov";
 // Start and end (inclusive) of forecast times that *should* be shown.
-// unstable: const unwrap https://github.com/rust-lang/rust/issues/67441
 const DAY_START: NaiveTime = NaiveTime::from_hms_opt(4, 30, 0).unwrap();
 const DAY_END: NaiveTime = NaiveTime::from_hms_opt(22, 30, 0).unwrap();
 /// We show every n periods in the future

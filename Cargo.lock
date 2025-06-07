@@ -1608,6 +1608,7 @@ dependencies = [
  "getrandom 0.3.3",
  "iced",
  "iced_fonts",
+ "itertools",
  "web-time",
 ]
 

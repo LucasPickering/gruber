@@ -21,7 +21,10 @@ chrono = {version = "0.4.41", default-features = false, features = [
     "serde",
 ]}
 iced = {version = "0.13.1", default-features = true, features = ["tokio"]}
-iced_aw = {version = "0.12.2", default-features = false, features = ["tab_bar"]}
+iced_aw = {version = "0.12.2", default-features = false, features = [
+    "grid",
+    "tab_bar",
+]}
 indexmap = "2.9.0"
 itertools = "0.14.0"
 log = "0.4.27"

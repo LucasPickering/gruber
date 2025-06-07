@@ -3,11 +3,16 @@ use crate::{
     services::weather::{Forecast, ForecastPeriod},
 };
 use iced::{
-    Element, Length,
-    widget::{Column, Text, text},
+    Element, Length, Padding,
+    alignment::Horizontal,
+    widget::{Column, Container, Text, text},
 };
-use iced_aw::{TabBar, TabLabel};
+use iced_aw::{Grid, TabBar, TabLabel, grid_row};
 
+const FONT_SIZE_MEDIUM: f32 = 32.0;
+const FONT_SIZE_LARGE: f32 = 48.0;
+
+/// Generate display elements
 pub fn view(state: &State) -> Element<Message> {
     // Build the tab bar
     let tabs = Tab::iter()
@@ -18,7 +23,7 @@ pub fn view(state: &State) -> Element<Message> {
         // Fill the entire screen evenly
         .tab_width(Length::FillPortion(Tab::iter().count() as u16))
         .padding(5.0)
-        .text_size(32.0);
+        .text_size(FONT_SIZE_MEDIUM);
     let content = match state.active_tab {
         Tab::Weather => {
             if let Some(forecast) = &state.forecast {
@@ -29,25 +34,38 @@ pub fn view(state: &State) -> Element<Message> {
         }
         Tab::Transit => text("TODO").into(),
     };
-    Column::new().push(tabs).push(content).into()
+    Column::new()
+        .push(tabs)
+        .push(Container::new(content).padding(16.0))
+        .into()
 }
 
 /// Generate elements for the weather forecast
 fn view_weather(forecast: &Forecast) -> Element<'_, Message> {
-    fn view_period(period: &ForecastPeriod) -> Text<'_> {
-        text(format!(
-            "{} / {}",
-            period.temperature(),
-            period.prob_of_precip()
-        ))
-    }
+    // Now
+    let now = forecast.now();
+    let now_text =
+        text(format!("{} / {}", now.temperature(), now.prob_of_precip()))
+            .size(FONT_SIZE_LARGE);
 
-    Column::new()
-        .push(view_period(forecast.now()).size(32))
-        .extend(
-            forecast
-                .future_periods()
-                .map(|period| view_period(period).into()),
-        )
-        .into()
+    // Later
+    let num_future_periods = 8;
+    let future_grid = Grid::with_rows(
+        forecast
+            .future_periods()
+            .take(num_future_periods)
+            .map(|period| {
+                grid_row!(
+                    text(format!("{}", period.start_time().format("%_I%P"))),
+                    text(period.temperature()),
+                    text(period.prob_of_precip()),
+                )
+            })
+            .collect(),
+    )
+    .padding(Padding::ZERO.top(8.0))
+    .horizontal_alignment(Horizontal::Right)
+    .column_spacing(8.0);
+
+    Column::new().push(now_text).push(future_grid).into()
 }
