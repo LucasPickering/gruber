@@ -6,18 +6,26 @@ use crate::{
     config::Config,
     services::weather::{self, Forecast},
 };
-use iced::Task;
+use iced::{Task, window};
 use iced_aw::iced_fonts;
 use std::fmt::Display;
 
 fn main() -> anyhow::Result<()> {
     let config = Config::load()?;
 
+    let window_settings = window::Settings {
+        size: config.window_size.into(),
+        position: config
+            .window_position
+            .map(|position| window::Position::Specific(position.into()))
+            .unwrap_or_default(),
+        ..window::Settings::default()
+    };
     iced::application("Gruber", State::update, view::view)
         // .subscription(State::subscription)
         .font(iced_fonts::REQUIRED_FONT_BYTES)
         .resizable(false)
-        .window_size(config.window_size)
+        .window(window_settings)
         .run_with(|| {
             (State::new(config), Task::done(Message::WeatherFetchStart))
         })?;

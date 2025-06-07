@@ -7,6 +7,8 @@ use std::fs::File;
 #[derive(Debug, Deserialize)]
 pub struct Config {
     pub window_size: (f32, f32),
+    /// Optionally force the position of the opening window
+    pub window_position: Option<(f32, f32)>,
     pub forecast_office: String,
     pub forecast_gridpoint: (u32, u32),
     pub transit_lines: Vec<TransitLine>,
