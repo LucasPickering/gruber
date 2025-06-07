@@ -1,100 +1,131 @@
-#![expect(unused)] // TODO remove
-
-use crate::{config::Config, services::ApiFetcher};
+use crate::{
+    Message,
+    config::Config,
+    services::{CLIENT, ExternalData, FetchedData},
+};
+use anyhow::Context;
 use chrono::{DateTime, Utc};
 use indexmap::IndexMap;
 use itertools::Itertools;
-use log::error;
+use log::{error, info};
 use serde::Deserialize;
 use std::{fmt::Display, time::Duration};
 
 #[derive(Debug)]
 pub struct Transit {
-    fetcher: ApiFetcher<ApiPredictions>,
+    url: String,
     lines: Vec<TransitLine>,
+    /// Prediction data loaded from the API
+    data: Option<FetchedData<ApiPredictions>>,
 }
 
 impl Transit {
-    /// Time between fetches
-    const DATA_TTL: Duration = Duration::from_secs(30);
     /// Max number of pending departures to show for a stop
-    const MAX_PREDICTIONS: usize = 2;
+    const MAX_PREDICTIONS: usize = 3;
 
     pub fn new(config: &Config) -> Self {
         let all_stops = config
             .transit_lines
             .iter()
-            .flat_map(|line| [line.inbound_stop, line.outbound_stop]);
+            .flat_map(|line| &line.stops)
+            .map(|stop| stop.id);
         let url = format!(
             "https://api-v3.mbta.com/predictions?filter[stop]={}",
             all_stops.format(",")
         );
         Self {
-            fetcher: ApiFetcher::new(url, Self::DATA_TTL),
+            url,
             lines: config.transit_lines.clone(),
+            data: None,
         }
     }
 
+    /// Get predictions for all stops on all lines
     pub fn predictions(&self) -> Predictions {
-        struct Helper {
-            inbound_stop: u32,
-            outbound_stop: u32,
-            inbound: Vec<DateTime<Utc>>,
-            outbound: Vec<DateTime<Utc>>,
-        }
-
-        // Group predictions as (line, (inbound, outbound))
-        let mut grouped: IndexMap<String, Helper> = self
+        // Group predictions as (line, stops)
+        let mut grouped: IndexMap<String, Vec<StopPrediction>> = self
             .lines
             .iter()
             .map(|line| {
                 (
                     line.name.clone(),
-                    Helper {
-                        inbound_stop: line.inbound_stop,
-                        outbound_stop: line.outbound_stop,
-                        inbound: Vec::new(),
-                        outbound: Vec::new(),
-                    },
+                    line.stops
+                        .iter()
+                        .map(|stop| StopPrediction {
+                            id: stop.id,
+                            name: stop.name.clone(),
+                            predictions: CountdownList::default(),
+                        })
+                        .collect(),
                 )
             })
             .collect();
 
         // Pull data from the most recent response
-        if let Some(data) = self.fetcher.data() {
-            for prediction in data.data {
+        if let Some(data) = &self.data {
+            for prediction in &data.data.data {
                 // Departure time will be empty if the stop is being skipped
                 let Some(departure_time) = prediction.attributes.departure_time
                 else {
                     continue;
                 };
-                let route_id = prediction.relationships.route.data.id;
-                let Some(group) = grouped.get_mut(&route_id) else {
+                let route_id = &prediction.relationships.route.data.id;
+                let Some(stops) = grouped.get_mut(route_id) else {
                     error!("Unknown route {route_id}");
                     continue;
                 };
                 let stop_id = &prediction.relationships.stop.data.id;
 
-                if stop_id == &group.inbound_stop.to_string() {
-                    group.inbound.push(departure_time);
-                } else if stop_id == &group.outbound_stop.to_string() {
-                    group.outbound.push(departure_time);
-                } else {
+                let Some(stop_prediction) = stops
+                    .iter_mut()
+                    .find(|stop| &stop.id.to_string() == stop_id)
+                else {
                     error!("Unknown stop {stop_id} for route {route_id}");
-                }
+                    continue;
+                };
+                stop_prediction.predictions.push(departure_time);
             }
         }
 
         // We want to show empty data if we don't have an API response yet
         let lines = grouped
             .into_iter()
-            .map(|(name, data)| LinePrediction {
-                name,
-                inbound: data.inbound.into(),
-                outbound: data.outbound.into(),
-            })
+            .map(|(name, stops)| LinePrediction { name, stops })
             .collect();
         Predictions { lines }
+    }
+}
+
+impl ExternalData for Transit {
+    const TTL: Duration = Duration::from_secs(30);
+    type Data = ApiPredictions;
+
+    fn data(&self) -> Option<&FetchedData<Self::Data>> {
+        self.data.as_ref()
+    }
+
+    fn set_data(&mut self, data: FetchedData<Self::Data>) {
+        self.data = Some(data);
+    }
+
+    fn data_to_message(data: FetchedData<Self::Data>) -> Message {
+        Message::TransitFetched(data)
+    }
+
+    fn fetch(
+        &self,
+    ) -> impl 'static + Future<Output = anyhow::Result<Self::Data>> + Send {
+        info!("Fetching transit data from {}", self.url);
+        let request = CLIENT.get(&self.url);
+        async move {
+            let response =
+                request.send().await.context("Error fetching transit")?;
+            response
+                .error_for_status()?
+                .json()
+                .await
+                .context("Error parsing transit")
+        }
     }
 }
 
@@ -102,10 +133,17 @@ impl Transit {
 #[derive(Clone, Debug, Deserialize)]
 pub struct TransitLine {
     pub name: String,
-    /// ID of the inbound stop you care about
-    pub inbound_stop: u32,
-    /// ID of the outbound stop you care about
-    pub outbound_stop: u32,
+    /// Stops on the line to monitor
+    pub stops: Vec<TransitStop>,
+}
+
+/// Configuration for a single stop on a transit line
+#[derive(Clone, Debug, Deserialize)]
+pub struct TransitStop {
+    /// Display name for the stop/direction
+    pub name: String,
+    /// API ID of the stop
+    pub id: u32,
 }
 
 #[derive(Debug)]
@@ -116,32 +154,44 @@ pub struct Predictions {
 #[derive(Debug)]
 pub struct LinePrediction {
     pub name: String,
-    pub inbound: CountdownList,
-    pub outbound: CountdownList,
+    pub stops: Vec<StopPrediction>,
 }
 
 #[derive(Debug)]
+pub struct StopPrediction {
+    pub id: u32,
+    pub name: String,
+    pub predictions: CountdownList,
+}
+
+#[derive(Debug, Default)]
 pub struct CountdownList(Vec<Countdown>);
 
-/// Convert a list of timestamps into relative offsets from now, sorting and
-/// truncating as necessary
-impl From<Vec<DateTime<Utc>>> for CountdownList {
-    fn from(value: Vec<DateTime<Utc>>) -> Self {
-        let now = Utc::now();
-        let countdowns = value
-            .into_iter()
-            // Get the first n upcoming timestamps
-            .sorted()
-            .take(Transit::MAX_PREDICTIONS)
-            .map(|dt| Countdown((dt - now).num_minutes()))
-            .collect();
-        Self(countdowns)
+impl CountdownList {
+    /// Add a timestamp to the list of countdowns. If already at max size, throw
+    /// it away
+    fn push(&mut self, departure_time: DateTime<Utc>) {
+        if self.0.len() < Transit::MAX_PREDICTIONS {
+            let now = Utc::now();
+            let countdown = Countdown((departure_time - now).num_minutes());
+            self.0.push(countdown);
+        }
     }
 }
 
 impl Display for CountdownList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}m", self.0.iter().format(","))
+        // Format countdowns as "1m, 5m, 10m"
+        write!(
+            f,
+            "{}",
+            self.0
+                .iter()
+                .format_with(", ", |countdown, f| f(&format_args!(
+                    "{}m",
+                    countdown.0
+                )))
+        )
     }
 }
 
@@ -157,7 +207,7 @@ impl Display for Countdown {
 
 /// <https://api-v3.mbta.com/docs/swagger/index.html#/Prediction/ApiWeb_PredictionController_index>
 #[derive(Clone, Debug, Deserialize)]
-struct ApiPredictions {
+pub struct ApiPredictions {
     data: Vec<Prediction>,
 }
 

@@ -4,10 +4,7 @@ mod view;
 
 use crate::{
     config::Config,
-    services::{
-        ExternalData, FetchedData,
-        weather::{Forecast, Weather},
-    },
+    services::{ExternalData, FetchedData, transit::Transit, weather::Weather},
 };
 use iced::{Subscription, Task, Theme, window};
 use iced_aw::iced_fonts;
@@ -46,23 +43,26 @@ enum Message {
     /// be refetched
     CheckData,
     TabSelected(Tab),
-    WeatherFetched(FetchedData<Forecast>),
+    WeatherFetched(FetchedData<<Weather as ExternalData>::Data>),
+    TransitFetched(FetchedData<<Transit as ExternalData>::Data>),
 }
 
 /// Global app state
 #[derive(Debug)]
 struct State {
-    config: Config,
     active_tab: Tab,
     weather: Weather,
+    transit: Transit,
 }
 
 impl State {
     fn new(config: Config) -> Self {
+        let weather = Weather::new(&config);
+        let transit = Transit::new(&config);
         Self {
-            config,
             active_tab: Tab::Weather,
-            weather: Weather::default(),
+            weather,
+            transit,
         }
     }
 
@@ -71,14 +71,14 @@ impl State {
         match message {
             Message::CheckData => {
                 // Check all data sources in parallel
-                return Task::batch([self
-                    .weather
-                    .fetch_if_needed(&self.config)]);
+                return Task::batch([
+                    self.weather.fetch_if_needed(),
+                    self.transit.fetch_if_needed(),
+                ]);
             }
             Message::TabSelected(index) => self.active_tab = index,
-            Message::WeatherFetched(forecast) => {
-                self.weather.set_data(forecast)
-            }
+            Message::WeatherFetched(data) => self.weather.set_data(data),
+            Message::TransitFetched(data) => self.transit.set_data(data),
         }
         Task::none()
     }

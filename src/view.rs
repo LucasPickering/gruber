@@ -1,4 +1,10 @@
-use crate::{Message, State, Tab, services::weather::Forecast};
+use crate::{
+    Message, State, Tab,
+    services::{
+        transit::{LinePrediction, Predictions},
+        weather::Forecast,
+    },
+};
 use iced::{
     Element, Length, Padding,
     alignment::Horizontal,
@@ -29,7 +35,10 @@ pub fn view(state: &State) -> Element<Message> {
                 text("Loading...").into()
             }
         }
-        Tab::Transit => text("TODO").into(),
+        Tab::Transit => {
+            let predictions = state.transit.predictions();
+            view_transit(predictions)
+        }
     };
     Column::new()
         .push(tabs)
@@ -65,4 +74,31 @@ fn view_weather(forecast: &Forecast) -> Element<'_, Message> {
     .column_spacing(8.0);
 
     Column::new().push(now_text).push(future_grid).into()
+}
+
+/// Display transit predictions
+fn view_transit(predictions: Predictions) -> Element<'static, Message> {
+    fn view_line(line: LinePrediction) -> Element<'static, Message> {
+        Column::new()
+            .push(text(line.name).size(FONT_SIZE_MEDIUM))
+            .push(
+                Grid::with_rows(
+                    line.stops
+                        .into_iter()
+                        .map(|stop| {
+                            grid_row!(
+                                text(stop.name),
+                                text(stop.predictions.to_string())
+                            )
+                        })
+                        .collect(),
+                )
+                .column_spacing(8.0),
+            )
+            .into()
+    }
+
+    Column::new()
+        .extend(predictions.lines.into_iter().map(view_line))
+        .into()
 }

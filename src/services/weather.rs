@@ -17,12 +17,26 @@ const DAY_END: NaiveTime = NaiveTime::from_hms_opt(22, 30, 0).unwrap();
 const PERIOD_INTERNAL: usize = 4;
 
 /// Fetch weather data from the weather.gov API
-#[derive(Debug, Default)]
-pub struct Weather(Option<FetchedData<Forecast>>);
+#[derive(Debug)]
+pub struct Weather {
+    url: String,
+    data: Option<FetchedData<Forecast>>,
+}
 
 impl Weather {
+    pub fn new(config: &Config) -> Self {
+        let url = format!(
+            "{}/gridpoints/{}/{},{}/forecast/hourly",
+            API_HOST,
+            config.forecast_office,
+            config.forecast_gridpoint.0,
+            config.forecast_gridpoint.1
+        );
+        Self { url, data: None }
+    }
+
     pub fn forecast(&self) -> Option<&Forecast> {
-        self.0.as_ref().map(|data| &data.data)
+        self.data.as_ref().map(|data| &data.data)
     }
 }
 
@@ -31,11 +45,11 @@ impl ExternalData for Weather {
     type Data = Forecast;
 
     fn data(&self) -> Option<&FetchedData<Self::Data>> {
-        self.0.as_ref()
+        self.data.as_ref()
     }
 
     fn set_data(&mut self, data: FetchedData<Self::Data>) {
-        self.0 = Some(data);
+        self.data = Some(data);
     }
 
     fn data_to_message(data: FetchedData<Self::Data>) -> Message {
@@ -43,23 +57,13 @@ impl ExternalData for Weather {
     }
 
     fn fetch(
-        config: &Config,
+        &self,
     ) -> impl 'static + Future<Output = anyhow::Result<Self::Data>> + Send {
-        let url = format!(
-            "{}/gridpoints/{}/{},{}/forecast/hourly",
-            API_HOST,
-            config.forecast_office,
-            config.forecast_gridpoint.0,
-            config.forecast_gridpoint.1
-        );
-
-        async {
-            info!("Fetching weather data from {}", url);
-            let response = CLIENT
-                .get(url)
-                .send()
-                .await
-                .context("Error fetching weather")?;
+        info!("Fetching weather data from {}", self.url);
+        let request = CLIENT.get(&self.url);
+        async move {
+            let response =
+                request.send().await.context("Error fetching weather")?;
             response
                 .error_for_status()?
                 .json()
