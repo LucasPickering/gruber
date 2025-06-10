@@ -1,0 +1,12 @@
+[Unit]
+Description=E-ink display control
+
+[Service]
+ExecStart=startx /home/pi/gruber/gruber
+WorkingDirectory=/home/pi/gruber
+Environment="RUST_BACKTRACE=1"
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

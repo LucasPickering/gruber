@@ -1,13 +1,13 @@
 [package]
-name = "gruber"
-description = "Raspberry Pi touchscreen GUI"
-version = "0.1.0"
 authors = ["Lucas Pickering <lucas@lucaspickering.me>"]
-keywords = []
-repository = "https://github.com/LucasPickering/gruber"
-homepage = "https://github.com/LucasPickering/gruber"
+description = "Raspberry Pi touchscreen GUI"
 edition = "2024"
+homepage = "https://github.com/LucasPickering/gruber"
+keywords = []
 license = "MIT"
+name = "gruber"
+repository = "https://github.com/LucasPickering/gruber"
+version = "0.1.0"
 # Keep in sync w/ rust-toolchain.toml
 rust-version = "1.86.0"
 
@@ -16,25 +16,15 @@ debug = false
 
 [dependencies]
 anyhow = "1.0.98"
-chrono = {version = "0.4.41", default-features = false, features = [
-    "clock",
-    "serde",
-]}
+chrono = {version = "0.4.41", default-features = false, features = ["clock", "serde"]}
 iced = {version = "0.13.1", default-features = true, features = ["tokio"]}
-iced_aw = {version = "0.12.2", default-features = false, features = [
-    "grid",
-    "tab_bar",
-]}
+iced_aw = {version = "0.12.2", default-features = false, features = ["grid", "tab_bar"]}
 indexmap = "2.9.0"
 itertools = "0.14.0"
 log = "0.4.27"
-reqwest = {version = "0.12.19", default-features = false, features = [
-    "rustls-tls",
-    "json",
-]}
+reqwest = {version = "0.12.19", default-features = false, features = ["rustls-tls", "json"]}
 serde = {version = "1.0.219", default-features = false, features = ["derive"]}
 serde_json = {version = "1.0.140"}
-ureq = {version = "2.9.6", features = ["json"]}
 
 [workspace.lints.rust]
 async_fn_in_trait = "allow"
