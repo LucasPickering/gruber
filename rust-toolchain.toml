@@ -2,4 +2,3 @@
 # Keep in sync w/ MSRV
 channel = "1.86.0"
 components = ["cargo", "clippy", "rustfmt"]
-targets = ["armv7-unknown-linux-musleabihf"]
